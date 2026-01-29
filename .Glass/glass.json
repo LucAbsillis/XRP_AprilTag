@@ -1,0 +1,47 @@
+{
+  "NetworkTables": {
+    "transitory": {
+      "CameraPublisher": {
+        "Detected": {
+          "open": true,
+          "string[]##v_/CameraPublisher/Detected/streams": {
+            "open": true
+          }
+        },
+        "USB Camera 0": {
+          "open": true
+        },
+        "USB Camera 1": {
+          "open": true,
+          "string[]##v_/CameraPublisher/USB Camera 1/streams": {
+            "open": true
+          }
+        },
+        "open": true
+      },
+      "apriltags": {
+        "open": true
+      }
+    },
+    "types": {
+      "/FMSInfo": "FMSInfo",
+      "/SmartDashboard/SendableChooser[0]": "String Chooser"
+    }
+  },
+  "NetworkTables Info": {
+    "Clients": {
+      "open": true
+    },
+    "cscore@1": {
+      "Publishers": {
+        "open": true
+      }
+    },
+    "visible": true
+  },
+  "NetworkTables Settings": {
+    "dsClient": false,
+    "mode": "Client (NT4)",
+    "serverTeam": "192.168.68.69"
+  }
+}
