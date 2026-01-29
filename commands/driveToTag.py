@@ -7,7 +7,7 @@ import time
 class DriveToTag(commands2.Command):
     def __init__(self, tagToFind: int, drive: Drivetrain) -> None:
         """ commands, first looks for specific april tag 
-        if found calculates bearing and distance, turns robot towards target and drives distance minus 20 cm  (7.8 inch)
+        if found calculates bearing and distance, turns robot towards target and drives distance minus 40 cm  (7.8 inch)
         :param tagToFind: april tag id
         :param drive:  The drivetrain subsystem on which this command will run
         """
@@ -39,17 +39,16 @@ class DriveToTag(commands2.Command):
         self.drive.resetEncoders()
         self.updateTagFound()
         self.rotationCount=0
-        self.rotAngle=20
+        self.rotAngle=25
         self.inchPerDegree = math.pi * 6.102 / 360
         self.updateTagFound()
         if self.tagFound:  
-            self.currentState = "initDrive"
+            self.setState("initDrive")
             self.initDrive()
         else:
-            self.currentState = "looking"
+            self.setState("looking")
     def execute(self) -> None:
         """Called every time the scheduler runs while the command is scheduled.""" 
-        #TODO Make this non-blocking
         if self.currentState == "looking" :
             self.locateTag()
         elif self.currentState == "initDrive":
@@ -67,6 +66,10 @@ class DriveToTag(commands2.Command):
         # Compare distance travelled from start to desired distance
         return self.stopCommand
     
+    def setState(self,state):
+        self.currentState = state
+        print(f"Setting state to {state}")    
+
     # def getAverageTurningDistance(self) -> float:
     #     leftDistance = abs(self.drive.getLeftDistanceInch())
     #     rightDistance = abs(self.drive.getRightDistanceInch())
@@ -79,24 +82,25 @@ class DriveToTag(commands2.Command):
 
     # looks for apriltag with tagToFind ID by performing 360 turn until found, commands stops if not found  
     def locateTag(self):
-        print("looking")
+        #print("looking")
         self.updateTagFound()
         if not(self.tagFound):
             if self.rotationCount > 360/self.rotAngle:
                 print("Completed search turn")
                 self.drive.arcadeDrive(0, 0)
                 self.stopCommand=True
+                self.currentstate="done"
             else:
                 if self.rotationCount == 0:
                         #start first rotation
                         print(f"rotation: {self.rotationCount}") 
                         self.rotationCount = self.rotationCount+1
                         self.drive.arcadeDrive(self.speed,self.turnspeed)# turn slow
-                if self.self.drive.getAverageDistanceInch() >= self.inchPerDegree * self.rotAngle:
+                if self.drive.getAverageDistanceInch() >= self.inchPerDegree * self.rotAngle:
                     # end of turn segment stop rotating and check for vision
-                    print("stopping rotation")
                     self.drive.arcadeDrive(0, 0)
-                    time.sleep(1)
+                    print("stopping rotation")
+                    time.sleep(0.8)
                     # need to wait for camera processing to catch up 
                     self.updateTagFound()
                     if not(self.tagFound):
@@ -106,36 +110,45 @@ class DriveToTag(commands2.Command):
                         print(f"rotation: {self.rotationCount}")
                         self.drive.arcadeDrive(self.speed,self.turnspeed)# turn 
                     else:
-                        self.currentState = "initDrive"
+                        self.setState("initDrive")
                         self.initDrive()
                 else:
                     self.drive.arcadeDrive(self.speed,self.turnspeed)# turn   
         else:
             # init drive to tag
-            self.currentState = "initDrive"
+            self.setState("initDrive")
             self.initDrive()
 
     # initialize bearing and distance to tagToFind before d    
     def initDrive(self):
         # make sure tag is still visible
+        self.drive.arcadeDrive(0, 0)
         self.updateTagFound()
         if self.tagFound:  
-            print(f"Tag {self.tagFound} found")
-            self.drive.arcadeDrive(0, 0)
+            print(f"Tag {self.tag} found")
             self.relativePosition=self.apriltags.getDoubleArrayTopic(f"aprilID_{self.tag}").subscribe([]) 
-            self.currentState= ""
-            self.commandDrive() 
+            self.commandDrive()
+        else:
+            print(f"Tag {self.tag} no longer visibile") 
+            self.stopCommand=True
+            self.currentstate="done"
 
-    # called when tagToFind is visible, gets bearing and distance to tag, turns towards tag and drives distance - 20 cm
+    # called when tagToFind is visible, gets bearing and distance to tag, turns towards tag and drives distance - 40 cm
     def commandDrive(self):
         if self.currentState == "initDrive":
+            self.drive.arcadeDrive(0, 0)
             position=self.relativePosition.get()
-            self.distanceToTarget= (abs(position[0])-0.2) *39.3701 #substract 20 cm and convert meters to inches 
+            self.distanceToTarget= (abs(position[0])-0.4) *39.3701 #substract 40 cm and convert meters to inches 
             self.bearing = position[1]
-            if self.bearing > 5: # turn if more than 5 degrees 
+            print(f"Distance: {self.distanceToTarget} Bearing: {self.bearing}")
+            if abs(self.bearing) > 5: # turn if more than 5 degrees 
                 self.drive.resetEncoders()
-                self.currentState = "turning"
+                self.setState("turning")
                 self.turn(self.bearing)
+            else:
+                self.drive.resetEncoders()
+                self.setState("driving")
+                self.driveForward(self.distanceToTarget)
         elif self.currentState == "turning":
             self.turn(self.bearing)
         elif self.currentState == "driving":
@@ -143,11 +156,13 @@ class DriveToTag(commands2.Command):
 
     # turn robot degrees
     def turn(self,degrees:float):
-        print(f"Turning {degrees} degrees")
-        if self.drive.getAverageDistanceInch() >= self.inchPerDegree * degrees:
+        #print(f"Turning {degrees} degrees")
+        if self.drive.getAverageDistanceInch() >= self.inchPerDegree * abs(degrees):
             self.drive.arcadeDrive(0, 0)
+            turned = self.drive.getAverageDistanceInch()/self.inchPerDegree
+            print(f"Turned distance = {self.drive.getAverageDistanceInch()} calculated degrees {turned} ")
             self.drive.resetEncoders()
-            self.currentState = "driving"          
+            self.setState("driving")      
             self.driveForward(self.distanceToTarget)
         else:     
             if degrees >0:
@@ -157,10 +172,10 @@ class DriveToTag(commands2.Command):
                 
     # drive robot forward until distance is reached
     def driveForward(self,distance:float):
-        print(f"driving {distance} inches forward")
+        #print(f"driving {distance} inches forward")
         if self.drive.getAverageDistanceInch() >= distance:
             self.drive.arcadeDrive(0, 0)
-            print("Reached tag")
+            print(f"Reached tag - driven distance {self.drive.getAverageDistanceInch()}")
             self.stopCommand=True
             self.currentState="done"
         else:

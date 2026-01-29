@@ -74,7 +74,7 @@ class RobotContainer:
         )
 
         joystickCButton = commands2.button.JoystickButton(self.controller, 3)
-        joystickCButton.onTrue(DriveToTag(0.7,9,self.drivetrain))
+        joystickCButton.onTrue(DriveToTag(9,self.drivetrain))
 
         # Setup SmartDashboard options
         self.chooser.setDefaultOption(
